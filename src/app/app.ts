@@ -63,6 +63,11 @@ guardarRegistro(ejercicio: Ejercicio) {
 
   ejercicio.historial.push(registro);
   this.guardarDatos();
+
+  // Al guardar, vuelve a la selección de ejercicio, manteniendo la fecha elegida.
+  ejercicio.pesoActual = null;
+  ejercicio.repeticionesActuales = null;
+  this.ejercicioSeleccionadoParaRegistro = null;
 }
 
 
@@ -548,14 +553,80 @@ cargarDatos() {
     return `${anio}-${mes}-${dia}`;
 }
 
+
+
+  private obtenerClaveFecha(fecha: Date): string {
+    const anio = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${anio}-${mes}-${dia}`;
+  }
+
+  private obtenerFechasConActividad(): Set<string> {
+    const fechas = new Set<string>();
+
+    for (const grupo of this.gruposMusculares) {
+      for (const ejercicio of this.ejercicios[grupo]) {
+        for (const registro of ejercicio.historial) {
+          fechas.add(this.obtenerClaveFecha(new Date(registro.fecha)));
+        }
+      }
+    }
+
+    return fechas;
+  }
+
+  obtenerDiasCalendario(): { clave: string; dia: number; nombreDia: string; activo: boolean }[] {
+    const fechasActivas = this.obtenerFechasConActividad();
+    const dias: { clave: string; dia: number; nombreDia: string; activo: boolean }[] = [];
+    const hoy = new Date(this.fecha);
+    hoy.setHours(12, 0, 0, 0);
+
+    for (let desplazamiento = 6; desplazamiento >= 0; desplazamiento--) {
+      const fechaDia = new Date(hoy);
+      fechaDia.setDate(hoy.getDate() - desplazamiento);
+      dias.push({
+        clave: this.obtenerClaveFecha(fechaDia),
+        dia: fechaDia.getDate(),
+        nombreDia: new Intl.DateTimeFormat('es-ES', { weekday: 'short' }).format(fechaDia).replace('.', ''),
+        activo: fechasActivas.has(this.obtenerClaveFecha(fechaDia))
+      });
+    }
+    return dias;
+  }
+
+  contarDiasActivosMes(): number {
+    return this.obtenerDiasCalendario().filter(celda => celda.activo).length;
+  }
+
   grupoSeleccionado = '';
   nuevoEjercicioNombre = '';
   ejercicioProgresoSeleccionado = '';
+  ejercicioSeleccionadoParaRegistro: Ejercicio | null = null;
 
+  esRegistroValido(ejercicio: Ejercicio): boolean {
+    return (
+      ejercicio.pesoActual !== null &&
+      Number.isFinite(ejercicio.pesoActual) &&
+      ejercicio.pesoActual >= 0 &&
+      ejercicio.repeticionesActuales !== null &&
+      Number.isInteger(ejercicio.repeticionesActuales) &&
+      ejercicio.repeticionesActuales >= 1
+    );
+  }
+
+  seleccionarEjercicioParaRegistro(ejercicio: Ejercicio) {
+    this.ejercicioSeleccionadoParaRegistro = ejercicio;
+  }
+
+  cancelarSeleccionEjercicio() {
+    this.ejercicioSeleccionadoParaRegistro = null;
+  }
 
   seleccionarGrupo(grupo: string) {
     this.grupoSeleccionado = grupo;
     this.ejercicioProgresoSeleccionado = '';
+    this.ejercicioSeleccionadoParaRegistro = null;
   }
 
   obtenerEjercicios() {

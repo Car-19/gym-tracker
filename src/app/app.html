@@ -14,6 +14,29 @@
 
   <main class="main-content">
     @if (!grupoSeleccionado) {
+      <section class="activity-calendar" aria-label="Actividad de los últimos siete días">
+        <div class="activity-calendar-heading">
+          <div>
+            <span class="activity-kicker">TU CONSTANCIA</span>
+            <h2>Últimos 7 días</h2>
+            <p>Tus entrenamientos registrados</p>
+          </div>
+          <div class="activity-total">
+            <strong>{{ contarDiasActivosMes() }}</strong>
+            <span>días activos</span>
+          </div>
+        </div>
+        <div class="activity-days" aria-label="Actividad semanal">
+          @for (celda of obtenerDiasCalendario(); track celda.clave) {
+            <div class="activity-day-wrap">
+              <span class="activity-weekday">{{ celda.nombreDia }}</span>
+              <div class="activity-day" [class.is-active]="celda.activo"
+                [attr.aria-label]="celda.nombreDia + ' ' + celda.dia + (celda.activo ? ', con actividad registrada' : ', sin actividad registrada')">{{ celda.dia }}</div>
+            </div>
+          }
+        </div>
+      </section>
+
       <section class="welcome-section">
         <div class="eyebrow">TU PROGRESO, A TU RITMO</div>
         <h1>Entrena con <span>propósito.</span></h1>
@@ -132,23 +155,6 @@
         <p>Registra tus marcas y consulta el historial de cada ejercicio.</p>
       </section>
 
-      <section class="date-selector-panel">
-        <label for="fechaEntrenamiento">
-          <span class="date-selector-icon">▦</span>
-          <span class="date-selector-copy">
-            <strong>Fecha del entrenamiento</strong>
-            <small>Selecciona el día que quieres registrar</small>
-          </span>
-        </label>
-
-        <input
-          id="fechaEntrenamiento"
-          type="date"
-          [(ngModel)]="fechaEntrenamiento"
-          aria-label="Fecha del entrenamiento"
-        />
-      </section>
-
       <section class="workout-stats">
         <div class="stat-card">
           <span>Ejercicios</span>
@@ -265,7 +271,7 @@
       <section class="section-heading exercise-heading">
         <div>
           <h2>Lista de ejercicios</h2>
-          <p>Introduce tus marcas en cada ejercicio</p>
+          <p>Elige un ejercicio para registrar peso y repeticiones</p>
         </div>
       </section>
 
@@ -305,42 +311,78 @@
               }
             </div>
 
-            <div class="exercise-form">
-              <label class="field">
-                <span>PESO <small>KG</small></span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  [(ngModel)]="ejercicio.pesoActual"
-                  placeholder="0"
-                />
-              </label>
-
-              <label class="field">
-                <span>REPETICIONES</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  [(ngModel)]="ejercicio.repeticionesActuales"
-                  placeholder="0"
-                />
-              </label>
-
+            @if (ejercicioSeleccionadoParaRegistro !== ejercicio) {
               <button
-                class="save-button"
-                (click)="guardarRegistro(ejercicio)"
-                [disabled]="
-                  ejercicio.pesoActual === null ||
-                  ejercicio.repeticionesActuales === null ||
-                  ejercicio.pesoActual < 0 ||
-                  ejercicio.repeticionesActuales < 1
-                "
+                type="button"
+                class="choose-exercise-button"
+                (click)="seleccionarEjercicioParaRegistro(ejercicio)"
               >
-                Guardar registro
+                <span>Registrar este ejercicio</span>
+                <span aria-hidden="true">→</span>
               </button>
-            </div>
+            } @else {
+              <div class="registration-step" aria-label="Datos del registro">
+                <div class="registration-step-heading">
+                  <span class="step-number">2</span>
+                  <div>
+                    <strong>Fecha y resultado</strong>
+                    <small>La fecha se mantiene para los siguientes ejercicios.</small>
+                  </div>
+                </div>
+
+                <label class="registration-date-field" for="fechaEntrenamiento">
+                  <span>FECHA DEL ENTRENAMIENTO</span>
+                  <input
+                    id="fechaEntrenamiento"
+                    type="date"
+                    [(ngModel)]="fechaEntrenamiento"
+                    aria-label="Fecha del entrenamiento"
+                  />
+                </label>
+
+                <div class="exercise-form">
+                  <label class="field">
+                    <span>PESO <small>KG</small></span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      [(ngModel)]="ejercicio.pesoActual"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span>REPETICIONES</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      [(ngModel)]="ejercicio.repeticionesActuales"
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
+
+                <div class="registration-actions">
+                  <button type="button" class="registration-cancel-button" (click)="cancelarSeleccionEjercicio()">Cancelar</button>
+                  <button
+                    type="button"
+                    class="save-button"
+                    (click)="guardarRegistro(ejercicio)"
+                    [disabled]="
+                      ejercicio.pesoActual === null ||
+                      ejercicio.repeticionesActuales === null ||
+                      ejercicio.pesoActual < 0 ||
+                      ejercicio.repeticionesActuales < 1 ||
+                      !esRegistroValido(ejercicio)
+                    "
+                  >
+                    Guardar registro
+                  </button>
+                </div>
+              </div>
+            }
 
             @if (ejercicio.historial.length > 0) {
               <details class="history">
