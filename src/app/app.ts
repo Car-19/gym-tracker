@@ -12,6 +12,7 @@ interface Registro {
 
 interface Ejercicio {
   nombre: string;
+  esPersonalizado?: boolean;
   historial: Registro[];
   pesoActual: number | null;
   repeticionesActuales: number | null;
@@ -101,6 +102,7 @@ anadirEjercicio() {
 
   listaEjercicios.push({
     nombre,
+    esPersonalizado: true,
     historial: [],
     pesoActual: null,
     repeticionesActuales: null
@@ -196,21 +198,28 @@ cancelarEdicion() {
 
 
 borrarEjercicio(ejercicio: Ejercicio) {
+  if (!ejercicio.esPersonalizado) {
+    alert('Los ejercicios incluidos por defecto no se pueden borrar.');
+    return;
+  }
+
   const grupo = this.grupoSeleccionado as keyof typeof this.ejercicios;
-
-  const confirmado = confirm(
-    `¿Seguro que quieres borrar "${ejercicio.nombre}"?\n\n` +
-    'También se eliminará todo su historial. Esta acción no se puede deshacer.'
+  const primeraConfirmacion = confirm(
+    `¿Quieres eliminar el ejercicio personalizado "${ejercicio.nombre}"?`
   );
+  if (!primeraConfirmacion) return;
 
-  if (!confirmado) return;
+  const segundaConfirmacion = confirm(
+    `ÚLTIMA CONFIRMACIÓN
 
-  this.ejercicios[grupo] = this.ejercicios[grupo].filter(
-    item => item !== ejercicio
+Se eliminará "${ejercicio.nombre}" y todo su historial guardado. ¿Continuar?`
   );
+  if (!segundaConfirmacion) return;
 
+  this.ejercicios[grupo] = this.ejercicios[grupo].filter(item => item !== ejercicio);
   this.guardarDatos();
 }
+
 
 
 guardarDatos() {
@@ -226,13 +235,26 @@ cargarDatos() {
   if (datosGuardados) {
     this.ejercicios = JSON.parse(datosGuardados);
 
+    const ejerciciosDeSerie: Record<string, string[]> = {
+      Piernas: ['Sentadilla', 'Prensa', 'Extensión de cuádriceps', 'Curl femoral', 'Abductores', 'Glúteos', 'Gemelos'],
+      Hombros: ['Press militar', 'Elevaciones laterales', 'Pájaros', 'Elevaciones frontales', 'Elevación lateral a frontal', 'Press Arnold'],
+      Pecho: ['Press banca', 'Press inclinado', 'Aperturas', 'Polea pecho inferior', 'Mancuerna press banca', 'Mancuerna press inclinado', 'Mancuerna aperturas'],
+      Espalda: ['Jalón al pecho', 'Remo', 'Dominadas', 'Facepull', 'Peso muerto', 'Máquina jalón', 'Máquina remo', 'Máquina trapecio'],
+      'Bíceps': ['Curl con barra', 'Curl martillo', 'Curl en banco', 'Mancuerna libre', 'Curl martillo inclinado'],
+      'Tríceps': ['Barra en polea', 'Extensión en polea (bolas)', 'Mancuerna detrás de nuca'],
+      Cardio: ['Cinta', 'Bicicleta', 'Elíptica', 'Escaladora'],
+      Abdominales: ['Crunch', 'Elevaciones de piernas', 'Plancha', 'Abdominales en polea', 'Abdominales en banco', 'Abdominales en máquina']
+    };
+
     for (const grupo of this.gruposMusculares) {
-      for (const ejercicio of this.ejercicios[grupo]) {
-        ejercicio.historial = ejercicio.historial.map(registro => ({
+      this.ejercicios[grupo] = (this.ejercicios[grupo] || []).map(ejercicio => ({
+        ...ejercicio,
+        esPersonalizado: ejercicio.esPersonalizado ?? !(ejerciciosDeSerie[grupo] || []).includes(ejercicio.nombre),
+        historial: (ejercicio.historial || []).map(registro => ({
           ...registro,
           fecha: new Date(registro.fecha)
-        }));
-      }
+        }))
+      }));
     }
   }
 }
@@ -576,9 +598,31 @@ cargarDatos() {
     return fechas;
   }
 
-  obtenerDiasCalendario(): { clave: string; dia: number; nombreDia: string; activo: boolean }[] {
+  obtenerDiasCalendario(): {
+    clave: string;
+    dia: number;
+    nombreDia: string;
+    activo: boolean;
+    registros: number;
+  }[] {
     const fechasActivas = this.obtenerFechasConActividad();
-    const dias: { clave: string; dia: number; nombreDia: string; activo: boolean }[] = [];
+    const registrosPorFecha = new Map<string, number>();
+    for (const grupo of this.gruposMusculares) {
+      for (const ejercicio of this.ejercicios[grupo]) {
+        for (const registro of ejercicio.historial) {
+          const clave = this.obtenerClaveFecha(new Date(registro.fecha));
+          registrosPorFecha.set(clave, (registrosPorFecha.get(clave) ?? 0) + 1);
+        }
+      }
+    }
+
+    const dias: {
+      clave: string;
+      dia: number;
+      nombreDia: string;
+      activo: boolean;
+      registros: number;
+    }[] = [];
     const hoy = new Date(this.fecha);
     hoy.setHours(12, 0, 0, 0);
 
@@ -589,16 +633,27 @@ cargarDatos() {
         clave: this.obtenerClaveFecha(fechaDia),
         dia: fechaDia.getDate(),
         nombreDia: new Intl.DateTimeFormat('es-ES', { weekday: 'short' }).format(fechaDia).replace('.', ''),
-        activo: fechasActivas.has(this.obtenerClaveFecha(fechaDia))
+        activo: fechasActivas.has(this.obtenerClaveFecha(fechaDia)),
+        registros: registrosPorFecha.get(this.obtenerClaveFecha(fechaDia)) ?? 0
       });
     }
     return dias;
+  }
+
+  obtenerTotalRegistrosUltimosSieteDias(): number {
+    return this.obtenerDiasCalendario().reduce((total, dia) => total + dia.registros, 0);
+  }
+
+  obtenerAlturaGraficaActividad(registros: number): number {
+    const maximo = Math.max(...this.obtenerDiasCalendario().map(dia => dia.registros));
+    return registros === 0 || maximo === 0 ? 0 : Math.max(12, (registros / maximo) * 100);
   }
 
   contarDiasActivosMes(): number {
     return this.obtenerDiasCalendario().filter(celda => celda.activo).length;
   }
 
+  pestanaActiva: 'inicio' | 'entrenar' | 'estadisticas' = 'inicio';
   grupoSeleccionado = '';
   nuevoEjercicioNombre = '';
   ejercicioProgresoSeleccionado = '';
@@ -747,5 +802,56 @@ obtenerPuntosGrafica(): string {
 }
 
 
-}
 
+  cambiarPestana(pestana: 'inicio' | 'entrenar' | 'estadisticas') {
+    this.pestanaActiva = pestana;
+    this.grupoSeleccionado = '';
+    this.ejercicioSeleccionadoParaRegistro = null;
+    this.ejercicioProgresoGlobal = '';
+  }
+
+  ejercicioProgresoGlobal = '';
+
+  obtenerEjerciciosConHistorialGlobal(): { clave: string; nombre: string; grupo: string; historial: Registro[] }[] {
+    return this.gruposMusculares.flatMap(grupo =>
+      this.ejercicios[grupo]
+        .filter(ejercicio => ejercicio.historial.length > 0)
+        .map(ejercicio => ({ clave: `${grupo}|||${ejercicio.nombre}`, nombre: ejercicio.nombre, grupo, historial: ejercicio.historial }))
+    );
+  }
+
+  obtenerRegistrosGraficaGlobal(): Registro[] {
+    const ejercicio = this.obtenerEjerciciosConHistorialGlobal().find(item => item.clave === this.ejercicioProgresoGlobal);
+    if (!ejercicio) return [];
+    return [...ejercicio.historial].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()).slice(-10);
+  }
+
+  obtenerXGraficaGlobal(indice: number): number {
+    const registros = this.obtenerRegistrosGraficaGlobal();
+    return registros.length <= 1 ? 300 : 40 + indice * (520 / (registros.length - 1));
+  }
+
+  obtenerYGraficaGlobal(peso: number): number {
+    const registros = this.obtenerRegistrosGraficaGlobal();
+    if (!registros.length) return 175;
+    const pesos = registros.map(registro => registro.peso);
+    const minimo = Math.min(...pesos), maximo = Math.max(...pesos);
+    return minimo === maximo ? 105 : 175 - ((peso - minimo) / (maximo - minimo)) * 140;
+  }
+
+  obtenerPuntosGraficaGlobal(): string {
+    return this.obtenerRegistrosGraficaGlobal().map((registro, i) => `${this.obtenerXGraficaGlobal(i)},${this.obtenerYGraficaGlobal(registro.peso)}`).join(' ');
+  }
+
+  obtenerTotalRegistrosGlobal(): number {
+    return this.gruposMusculares.reduce((total, grupo) => total + this.ejercicios[grupo].reduce((suma, ejercicio) => suma + ejercicio.historial.length, 0), 0);
+  }
+
+  obtenerTotalEjercicios(): number {
+    return this.gruposMusculares.reduce(
+      (total, grupo) => total + this.ejercicios[grupo].length,
+      0
+    );
+  }
+
+}

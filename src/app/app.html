@@ -1,6 +1,6 @@
 <div class="app-shell">
   <header class="topbar">
-    <a class="brand" href="#" (click)="$event.preventDefault(); seleccionarGrupo('')">
+    <a class="brand" href="#" (click)="$event.preventDefault(); cambiarPestana('inicio')">
       <span class="brand-icon">G</span>
       <span>GYM<span class="brand-light">TRACKER</span></span>
     </a>
@@ -12,8 +12,32 @@
     </div>
   </header>
 
+  <nav class="bottom-nav" aria-label="Navegación principal">
+    <button
+      type="button"
+      [class.active]="pestanaActiva === 'inicio'"
+      (click)="cambiarPestana('inicio')"
+    >
+      <span class="nav-icon">⌂</span><span>Inicio</span>
+    </button>
+    <button
+      type="button"
+      [class.active]="pestanaActiva === 'entrenar'"
+      (click)="cambiarPestana('entrenar')"
+    >
+      <span class="nav-icon">↗</span><span>Entrenar</span>
+    </button>
+    <button
+      type="button"
+      [class.active]="pestanaActiva === 'estadisticas'"
+      (click)="cambiarPestana('estadisticas')"
+    >
+      <span class="nav-icon">▥</span><span>Estadísticas</span>
+    </button>
+  </nav>
+
   <main class="main-content">
-    @if (!grupoSeleccionado) {
+    @if (pestanaActiva === 'inicio') {
       <section class="activity-calendar" aria-label="Actividad de los últimos siete días">
         <div class="activity-calendar-heading">
           <div>
@@ -30,34 +54,63 @@
           @for (celda of obtenerDiasCalendario(); track celda.clave) {
             <div class="activity-day-wrap">
               <span class="activity-weekday">{{ celda.nombreDia }}</span>
-              <div class="activity-day" [class.is-active]="celda.activo"
-                [attr.aria-label]="celda.nombreDia + ' ' + celda.dia + (celda.activo ? ', con actividad registrada' : ', sin actividad registrada')">{{ celda.dia }}</div>
+              <div
+                class="activity-day"
+                [class.is-active]="celda.activo"
+                [attr.aria-label]="
+                  celda.nombreDia +
+                  ' ' +
+                  celda.dia +
+                  (celda.activo ? ', con actividad registrada' : ', sin actividad registrada')
+                "
+              >
+                {{ celda.dia }}
+              </div>
             </div>
           }
         </div>
       </section>
 
-      <section class="welcome-section">
-        <div class="eyebrow">TU PROGRESO, A TU RITMO</div>
-        <h1>Entrena con <span>propósito.</span></h1>
-        <p>Elige un grupo muscular para registrar tus ejercicios y seguir tu evolución.</p>
-      </section>
-
-      <section class="section-heading">
-        <div>
-          <h2>Tus entrenamientos</h2>
-          <p>Selecciona una zona para empezar</p>
+      <section class="home-summary-compact" aria-label="Resumen gráfico de actividad semanal">
+        <div class="home-summary-heading">
+          <div>
+            <span class="activity-kicker">RESUMEN SEMANAL</span>
+            <h2>Tu actividad</h2>
+          </div>
+          <div class="home-summary-total">
+            <strong>{{ obtenerTotalRegistrosUltimosSieteDias() }}</strong>
+            <span>registros</span>
+          </div>
         </div>
-        <span class="section-count">{{ gruposMusculares.length }} GRUPOS</span>
+        <div class="home-summary-chart" role="img" aria-label="Registros de entrenamiento por día">
+          @for (celda of obtenerDiasCalendario(); track celda.clave) {
+            <div class="home-summary-bar">
+              <span
+                class="home-summary-bar-track"
+                [attr.aria-label]="celda.registros + (celda.registros === 1 ? ' registro' : ' registros')"
+              >
+                <span
+                  class="home-summary-bar-fill"
+                  [style.height.%]="obtenerAlturaGraficaActividad(celda.registros)"
+                ></span>
+              </span>
+              <small>{{ celda.nombreDia }}</small>
+            </div>
+          }
+        </div>
       </section>
+    }
 
+    @if (pestanaActiva === 'entrenar' && !grupoSeleccionado) {
+      <section class="welcome-section compact-welcome">
+        <div class="eyebrow">TU ZONA DE ENTRENAMIENTO</div>
+        <h1>¿Qué vas a <span>entrenar?</span></h1>
+        <p>Elige un grupo muscular para ver sus ejercicios y registrar tus marcas.</p>
+      </section>
       <section class="muscle-grid">
         @for (grupo of gruposMusculares; track grupo; let i = $index) {
           <button class="muscle-card" (click)="seleccionarGrupo(grupo)">
-            <span class="muscle-number">
-              {{ (i + 1).toString().padStart(2, '0') }}
-            </span>
-
+            <span class="muscle-number">{{ (i + 1).toString().padStart(2, '0') }}</span>
             <span class="muscle-symbol">
               @switch (grupo) {
                 @case ('Piernas') {
@@ -86,159 +139,108 @@
                 }
               }
             </span>
-
             <span class="muscle-name">{{ grupo }}</span>
             <span class="muscle-meta">{{ ejercicios[grupo].length }} ejercicios</span>
             <span class="card-arrow">↗</span>
           </button>
         }
       </section>
+    }
 
-      @if (obtenerSesiones().length > 0) {
-        <section class="sessions-section">
-          <div class="section-heading">
-            <div>
-              <h2>Historial de entrenamientos</h2>
-              <p>Consulta qué ejercicios registraste cada día</p>
-            </div>
-            <span class="section-count">{{ obtenerSesiones().length }} DÍAS</span>
-          </div>
-
-          <div class="sessions-list">
-            @for (sesion of obtenerSesiones(); track sesion.fechaClave) {
-              <article class="session-card">
-                <div class="session-header">
-                  <div>
-                    <span class="session-date-label">SESIÓN DE ENTRENAMIENTO</span>
-                    <h3>{{ sesion.fecha | date: 'dd/MM/yyyy' }}</h3>
-                  </div>
-
-                  <span class="session-count">
-                    {{ sesion.registros.length }}
-                    {{ sesion.registros.length === 1 ? 'registro' : 'registros' }}
-                  </span>
-                </div>
-
-                <div class="session-records">
-                  @for (registro of sesion.registros; track $index) {
-                    <div class="session-record">
-                      <div class="session-exercise">
-                        <strong>{{ registro.ejercicio }}</strong>
-                        <small>{{ registro.grupo }}</small>
-                      </div>
-
-                      <div class="session-result">
-                        <strong>{{ registro.peso }} kg</strong>
-                        <span>× {{ registro.repeticiones }} reps</span>
-                      </div>
-                    </div>
-                  }
-                </div>
-              </article>
-            }
-          </div>
-        </section>
-      }
-
-      <section class="tip-panel">
-        <span class="tip-icon">✳</span>
-        <div>
-          <strong>La constancia marca la diferencia</strong>
-          <p>Registra tus sesiones y comprueba cómo avanzas con el tiempo.</p>
+    @if (pestanaActiva === 'estadisticas' && !grupoSeleccionado) {
+      <section class="welcome-section compact-welcome">
+        <div class="eyebrow">TUS DATOS</div>
+        <h1>Tu <span>progreso.</span></h1>
+        <p>Consulta la evolución de cualquier ejercicio.</p>
+      </section>
+      <section class="workout-stats global-stats">
+        <div class="stat-card">
+          <span>Días activos</span><strong>{{ contarDiasActivosMes() }}</strong
+          ><small>Últimos 7 días</small>
+        </div>
+        <div class="stat-card">
+          <span>Ejercicios</span><strong>{{ obtenerTotalEjercicios() }}</strong
+          ><small>En tu biblioteca</small>
+        </div>
+        <div class="stat-card">
+          <span>Registros</span><strong>{{ obtenerTotalRegistrosGlobal() }}</strong
+          ><small>Marcas guardadas</small>
         </div>
       </section>
-    } @else {
+      <section class="progress-panel">
+        <div class="progress-heading">
+          <div>
+            <div class="eyebrow">EVOLUCIÓN DE FUERZA</div>
+            <h2>Progreso por ejercicio</h2>
+            <p>Selecciona un ejercicio para ver tus últimas diez marcas.</p>
+          </div>
+        </div>
+        <label class="progress-selector"
+          ><span>Ejercicio</span
+          ><select [(ngModel)]="ejercicioProgresoGlobal">
+            <option value="">Selecciona un ejercicio...</option>
+            @for (ejercicio of obtenerEjerciciosConHistorialGlobal(); track ejercicio.clave) {
+              <option [value]="ejercicio.clave">
+                {{ ejercicio.nombre }} · {{ ejercicio.grupo }}
+              </option>
+            }
+          </select></label
+        >
+        @if (ejercicioProgresoGlobal && obtenerRegistrosGraficaGlobal().length > 0) {
+          <div class="progress-chart">
+            <div class="chart-summary">
+              <span>Últimas {{ obtenerRegistrosGraficaGlobal().length }} marcas</span
+              ><strong
+                >{{
+                  obtenerRegistrosGraficaGlobal()[obtenerRegistrosGraficaGlobal().length - 1].peso
+                }}
+                kg</strong
+              >
+            </div>
+            <svg
+              viewBox="0 0 600 210"
+              class="progress-svg"
+              role="img"
+              aria-label="Gráfica de evolución del peso"
+            >
+              <line x1="40" y1="35" x2="560" y2="35" class="chart-grid-line" />
+              <line x1="40" y1="105" x2="560" y2="105" class="chart-grid-line" />
+              <line x1="40" y1="175" x2="560" y2="175" class="chart-grid-line" />
+              <polyline [attr.points]="obtenerPuntosGraficaGlobal()" class="chart-line" />
+              @for (registro of obtenerRegistrosGraficaGlobal(); track $index; let i = $index) {
+                <circle
+                  [attr.cx]="obtenerXGraficaGlobal(i)"
+                  [attr.cy]="obtenerYGraficaGlobal(registro.peso)"
+                  r="5"
+                  class="chart-point"
+                >
+                  <title>{{ registro.fecha | date: 'dd/MM/yyyy' }}: {{ registro.peso }} kg</title>
+                </circle>
+              }
+            </svg>
+            <div class="progress-records">
+              @for (registro of obtenerRegistrosGraficaGlobal(); track $index) {
+                <div class="progress-record">
+                  <span>{{ registro.fecha | date: 'dd/MM/yy' }}</span
+                  ><strong>{{ registro.peso }} kg</strong
+                  ><small>{{ registro.repeticiones }} reps</small>
+                </div>
+              }
+            </div>
+          </div>
+        } @else {
+          <p class="progress-empty">Registra algún ejercicio para empezar a ver tu evolución.</p>
+        }
+      </section>
+    }
+
+    @if (pestanaActiva === 'entrenar' && grupoSeleccionado) {
       <section class="workout-heading">
         <button class="back-button" (click)="seleccionarGrupo('')">← Volver al resumen</button>
         <div class="eyebrow">TU ZONA DE ENTRENAMIENTO</div>
         <h1>{{ grupoSeleccionado }}</h1>
         <p>Registra tus marcas y consulta el historial de cada ejercicio.</p>
       </section>
-
-      <section class="workout-stats">
-        <div class="stat-card">
-          <span>Ejercicios</span>
-          <strong>{{ obtenerEjercicios().length }}</strong>
-          <small>En este grupo</small>
-        </div>
-
-        <div class="stat-card">
-          <span>Registros</span>
-          <strong>{{ contarRegistros() }}</strong>
-          <small>Sesiones guardadas</small>
-        </div>
-      </section>
-
-      @if (obtenerEjerciciosConHistorial().length > 0) {
-        <section class="progress-panel">
-          <div class="progress-heading">
-            <div>
-              <div class="eyebrow">TU EVOLUCIÓN</div>
-              <h2>Progreso de fuerza</h2>
-              <p>Compara tus últimas marcas en cada ejercicio.</p>
-            </div>
-          </div>
-
-          <label class="progress-selector">
-            <span>Selecciona un ejercicio</span>
-            <select [(ngModel)]="ejercicioProgresoSeleccionado">
-              <option value="">Elige un ejercicio...</option>
-              @for (ejercicio of obtenerEjerciciosConHistorial(); track ejercicio.nombre) {
-                <option [value]="ejercicio.nombre">
-                  {{ ejercicio.nombre }}
-                </option>
-              }
-            </select>
-          </label>
-
-          @if (ejercicioProgresoSeleccionado && obtenerRegistrosGrafica().length > 0) {
-            <div class="progress-chart">
-              <div class="chart-summary">
-                <span>Últimas {{ obtenerRegistrosGrafica().length }} marcas</span>
-                <strong>
-                  {{ obtenerRegistrosGrafica()[obtenerRegistrosGrafica().length - 1].peso }} kg
-                </strong>
-              </div>
-
-              <svg
-                viewBox="0 0 600 210"
-                class="progress-svg"
-                role="img"
-                aria-label="Gráfica de evolución del peso"
-              >
-                <line x1="40" y1="35" x2="560" y2="35" class="chart-grid-line" />
-                <line x1="40" y1="105" x2="560" y2="105" class="chart-grid-line" />
-                <line x1="40" y1="175" x2="560" y2="175" class="chart-grid-line" />
-
-                <polyline [attr.points]="obtenerPuntosGrafica()" class="chart-line" />
-
-                @for (registro of obtenerRegistrosGrafica(); track $index; let i = $index) {
-                  <circle
-                    [attr.cx]="obtenerXGrafica(i)"
-                    [attr.cy]="obtenerYGrafica(registro.peso)"
-                    r="5"
-                    class="chart-point"
-                  >
-                    <title>{{ registro.fecha | date: 'dd/MM/yyyy' }}: {{ registro.peso }} kg</title>
-                  </circle>
-                }
-              </svg>
-
-              <div class="progress-records">
-                @for (registro of obtenerRegistrosGrafica(); track $index) {
-                  <div class="progress-record">
-                    <span>{{ registro.fecha | date: 'dd/MM/yy' }}</span>
-                    <strong>{{ registro.peso }} kg</strong>
-                    <small>{{ registro.repeticiones }} reps</small>
-                  </div>
-                }
-              </div>
-            </div>
-          } @else {
-            <p class="progress-empty">Selecciona un ejercicio para consultar su evolución.</p>
-          }
-        </section>
-      }
 
       <section class="add-exercise-panel">
         <div class="add-exercise-copy">
@@ -296,15 +298,16 @@
                 </div>
               </div>
 
-              <button
-                type="button"
-                class="delete-button"
-                (click)="borrarEjercicio(ejercicio)"
-                [attr.aria-label]="'Borrar ejercicio ' + ejercicio.nombre"
-              >
-                <span aria-hidden="true">×</span>
-                Borrar
-              </button>
+              @if (ejercicio.esPersonalizado) {
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="borrarEjercicio(ejercicio)"
+                  [attr.aria-label]="'Borrar ejercicio ' + ejercicio.nombre"
+                >
+                  <span aria-hidden="true">×</span> Borrar
+                </button>
+              }
 
               @if (ejercicio.historial.length > 0) {
                 <span class="record-badge">● CON HISTORIAL</span>
@@ -365,7 +368,13 @@
                 </div>
 
                 <div class="registration-actions">
-                  <button type="button" class="registration-cancel-button" (click)="cancelarSeleccionEjercicio()">Cancelar</button>
+                  <button
+                    type="button"
+                    class="registration-cancel-button"
+                    (click)="cancelarSeleccionEjercicio()"
+                  >
+                    Cancelar
+                  </button>
                   <button
                     type="button"
                     class="save-button"
@@ -482,6 +491,45 @@
             }
           </article>
         }
+      </section>
+    }
+
+    @if (pestanaActiva === 'entrenar' && !grupoSeleccionado && obtenerSesiones().length > 0) {
+      <section class="sessions-section">
+        <div class="section-heading">
+          <div>
+            <h2>Historial</h2>
+            <p>Tus entrenamientos anteriores</p>
+          </div>
+          <span class="section-count">{{ obtenerSesiones().length }} DÍAS</span>
+        </div>
+        <div class="sessions-list">
+          @for (sesion of obtenerSesiones(); track sesion.fechaClave) {
+            <article class="session-card">
+              <div class="session-header">
+                <div>
+                  <span class="session-date-label">ENTRENAMIENTO</span>
+                  <h3>{{ sesion.fecha | date: 'dd/MM/yyyy' }}</h3>
+                </div>
+                <span class="session-count">{{ sesion.registros.length }} registros</span>
+              </div>
+              <div class="session-records">
+                @for (registro of sesion.registros; track $index) {
+                  <div class="session-record">
+                    <div class="session-exercise">
+                      <strong>{{ registro.ejercicio }}</strong
+                      ><small>{{ registro.grupo }}</small>
+                    </div>
+                    <div class="session-result">
+                      <strong>{{ registro.peso }} kg</strong
+                      ><span>× {{ registro.repeticiones }} reps</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </article>
+          }
+        </div>
       </section>
     }
   </main>
